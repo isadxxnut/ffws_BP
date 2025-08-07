@@ -958,6 +958,8 @@ const firebaseConfig = {
   measurementId: "G-F3CN9C599H"
 };
 
+
+
     firebase.initializeApp(firebaseConfig);
 }
 const db = firebase.database();
@@ -969,6 +971,7 @@ const gameStateRef = roomRef.child("gameState"); // Reference for main game stat
 const teamDataRef = roomRef.child("teamData"); // Reference for team names and players
 const teamReadinessRef = roomRef.child("teamReadiness"); // Reference for team ready status
 const slotAssignmentsRef = roomRef.child("slotAssignments"); // Reference for player assignments to slots
+const liveSelectionsRef = roomRef.child("liveSelections");
 
 // Define the steps of the ban/pick process
 const steps = [
@@ -998,7 +1001,8 @@ let teamBReady = false;
 let gameState = {}; // Global gameState variable
 let prevCurrentStep = -1; // To track step changes for confirming actions
 let localSlotAssignments = {}; // Stores locally selected player assignments before confirmation
-
+let myTeamAssignmentsSubmitted = false; 
+let liveSelections = {};
 let countdownStartTime = 0; // Timestamp when the current countdown started
 
 /**
@@ -1037,9 +1041,7 @@ function renderActiveSlots() {
             slotElement.innerHTML = `<span class="team-label">${step.team}</span> ${actionType}`;
         }
     });
-    
-    const selectedCount = selectedImages.filter(Boolean).length;
-    document.getElementById("confirmBtn").disabled = selectedCount !== step.slots.length;
+    // ไม่มีการควบคุมปุ่ม disabled จากฟังก์ชันนี้อีกต่อไป
 }
 
 
@@ -1142,6 +1144,9 @@ document.getElementById("confirmBtn").onclick = () => {
         }
         // Update Firebase with only this team's assignments
         slotAssignmentsRef.update(teamAssignments);
+
+        myTeamAssignmentsSubmitted = true; // <-- เพิ่มบรรทัดนี้
+
         // Give user feedback by disabling the button
         document.getElementById("confirmBtn").disabled = true;
         return;
@@ -1183,6 +1188,7 @@ document.getElementById("confirmBtn").onclick = () => {
     document.getElementById("confirmBtn").disabled = true;
     updateCharacterPoolVisuals();
     updateGameState(updates);
+    liveSelectionsRef.set({}); // <-- เพิ่มบรรทัดนี้เพื่อล้างข้อมูล
 };
 
 // Event listener for Team A Ready button
@@ -1227,6 +1233,9 @@ gameStateRef.on("value", snapshot => {
     // Update global state vars
     isStarted = gameState.isStarted;
     isPreparing = gameState.isPreparing;
+    if (!isPreparing) {
+        myTeamAssignmentsSubmitted = false;
+    }
     assignmentsConfirmed = gameState.assignmentsConfirmed;
     currentStep = gameState.currentStep;
     timeLeft = gameState.timeLeft;
@@ -1328,6 +1337,31 @@ gameStateRef.on("value", snapshot => {
     }
 });
 
+liveSelectionsRef.on("value", snapshot => {
+    liveSelections = snapshot.val() || {};
+    
+    const step = steps[currentStep];
+    if(isStarted && step) {
+        selectedImages = step.slots.map(slotId => {
+            const selection = liveSelections[slotId];
+            if (selection) {
+                const characterEl = document.querySelector(`.character[data-name="${selection.name}"]`);
+                return characterEl;
+            }
+            return null;
+        });
+        renderActiveSlots();
+        updateCharacterPoolVisuals();
+
+        // --- ส่วนที่เพิ่มเข้ามา ---
+        // ตรวจสอบและควบคุมปุ่มเฉพาะเมื่อเป็นเทิร์นของทีมนี้เท่านั้น
+        if (step.team === thisTeam) {
+            const selectedCount = selectedImages.filter(Boolean).length;
+            document.getElementById("confirmBtn").disabled = selectedCount !== step.slots.length;
+        }
+    }
+});
+
 
 // Listen for team data changes
 teamDataRef.on("value", snapshot => {
@@ -1355,13 +1389,21 @@ teamReadinessRef.on("value", snapshot => {
 // Listen for slot assignments changes
 slotAssignmentsRef.on("value", snapshot => {
     const assignments = snapshot.val() || {};
-    localSlotAssignments = { ...assignments };
+    // localSlotAssignments = { ...assignments };
+    localSlotAssignments = { ...localSlotAssignments, ...assignments };
     if (isPreparing || assignmentsConfirmed) {
         showPlayerDropdowns(isPreparing);
     }
+    // if (isPreparing) {
+    //     checkAssignmentsComplete();
+    // }
     if (isPreparing) {
-        checkAssignmentsComplete();
-    }
+      if (myTeamAssignmentsSubmitted) {
+            document.getElementById("confirmBtn").disabled = true;
+            return; // หยุดการทำงานทันที ป้องกันไม่ให้ checkAssignmentsComplete ทำงาน
+        }
+    checkAssignmentsComplete(assignments); // ส่งตัวแปร assignments เข้าไป
+}
 });
 
 // Listen for Firebase connection status
@@ -1395,27 +1437,35 @@ characterPoolRef.once("value").then(snapshot => {
         div.innerHTML = `<img src="${url}" alt="${name}"><div>${name}</div>`;
         div.dataset.name = name;
         div.onclick = () => {
-            const step = steps[currentStep];
-            if (!isStarted || !step || step.team !== thisTeam) return;
+    const step = steps[currentStep];
+    if (!isStarted || !step || step.team !== thisTeam) return; // <-- เพิ่มเงื่อนไขเช็คเทิร์น
 
-            gameStateRef.once("value", gsSnapshot => {
-                const globalUsedNames = Object.values(gsSnapshot.val().slots || {}).map(char => char.name);
-                if (globalUsedNames.includes(name)) return;
-                const existingIndex = selectedImages.findIndex(el => el && el.dataset.name === name);
-                if (existingIndex > -1) {
-                    selectedImages[existingIndex].classList.remove("used");
-                    selectedImages[existingIndex] = null;
-                } else {
-                    let targetIndex = selectedImages.findIndex(el => el === null);
-                    if (targetIndex !== -1) {
-                        selectedImages[targetIndex] = div;
-                        div.classList.add("used");
-                    }
-                }
-                renderActiveSlots();
-                updateCharacterPoolVisuals();
-            });
-        };
+    gameStateRef.once("value", gsSnapshot => {
+        const globalUsedNames = Object.values(gsSnapshot.val().slots || {}).map(char => char.name);
+        if (globalUsedNames.includes(name)) return;
+
+        const existingIndex = selectedImages.findIndex(el => el && el.dataset.name === name);
+        if (existingIndex > -1) {
+            selectedImages[existingIndex].classList.remove("used");
+            selectedImages[existingIndex] = null;
+            // เมื่อยกเลิก ให้ส่งค่า null ไปยัง Firebase
+            const slotIdToClear = step.slots[existingIndex];
+            liveSelectionsRef.child(slotIdToClear).set(null);
+        } else {
+            let targetIndex = selectedImages.findIndex(el => el === null);
+            if (targetIndex !== -1) {
+                selectedImages[targetIndex] = div;
+                div.classList.add("used");
+                // เมื่อเลือก ให้ส่งข้อมูลไปยัง Firebase
+                const slotId = step.slots[targetIndex];
+                const selectionData = { name: div.dataset.name, url: div.querySelector('img').src };
+                liveSelectionsRef.child(slotId).set(selectionData);
+            }
+        }
+        // ไม่ต้องเรียก renderActiveSlots() จากตรงนี้แล้ว
+        updateCharacterPoolVisuals();
+    });
+};
         poolContainer.appendChild(div);
     });
 });
@@ -1426,21 +1476,16 @@ steps.flatMap(step => step.slots).forEach(slotId => {
     if (!slot) return;
     slot.addEventListener("click", () => {
         const step = steps[currentStep];
+        // ตรวจสอบสิทธิ์การคลิกเหมือนเดิม
         if (!isStarted || !step || step.team !== thisTeam) return;
-
         if (!slot.classList.contains("active") || !step.slots.includes(slotId)) return;
         
+        // ตรวจสอบว่าในช่องมีตัวละครที่ถูก pre-select อยู่จริง
         const nameInSlot = slot.querySelector("div")?.textContent;
         if (!nameInSlot) return;
 
-        const slotIndexInStep = step.slots.indexOf(slotId);
-        
-        if (selectedImages[slotIndexInStep]) {
-            selectedImages[slotIndexInStep] = null;
-        }
-
-        renderActiveSlots();
-        updateCharacterPoolVisuals();
+        // สั่งให้ Firebase อัปเดตช่องนี้เป็นค่าว่างโดยตรง
+        liveSelectionsRef.child(slotId).set(null);
     });
 });
 
