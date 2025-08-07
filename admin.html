@@ -965,6 +965,7 @@ const gameStateRef = roomRef.child("gameState"); // Reference for main game stat
 const teamDataRef = roomRef.child("teamData"); // Reference for team names and players
 const teamReadinessRef = roomRef.child("teamReadiness"); // Reference for team ready status
 const slotAssignmentsRef = roomRef.child("slotAssignments"); // Reference for player assignments to slots
+const liveSelectionsRef = roomRef.child("liveSelections");
 
 // Define the steps of the ban/pick process
 const steps = [
@@ -994,7 +995,7 @@ let teamBReady = false;
 let gameState = {}; // Global gameState variable
 let prevCurrentStep = 0; // To track step changes for confirming actions
 let localSlotAssignments = {}; // Stores locally selected player assignments before confirmation
-
+let liveSelections = {};
 let countdownStartTime = 0; // Timestamp when the current countdown started
 
 /**
@@ -1033,9 +1034,7 @@ function renderActiveSlots() {
             slotElement.innerHTML = `<span class="team-label">${step.team}</span> ${actionType}`;
         }
     });
-    
-    const selectedCount = selectedImages.filter(Boolean).length;
-    document.getElementById("confirmBtn").disabled = selectedCount !== step.slots.length;
+    // ไม่มีการควบคุมปุ่ม disabled จากฟังก์ชันนี้อีกต่อไป
 }
 
 
@@ -1192,6 +1191,7 @@ document.getElementById("startBtn").onclick = () => {
     slotAssignmentsRef.set({});
     teamReadinessRef.set({ teamA: false, teamB: false });
     localSlotAssignments = {};
+    liveSelectionsRef.set({}); // <-- เพิ่มบรรทัดนี้เพื่อล้างข้อมูล
 };
 
 // Event listener for "Confirm" button
@@ -1471,6 +1471,28 @@ gameStateRef.on("value", snapshot => {
     }
 });
 
+liveSelectionsRef.on("value", snapshot => {
+    liveSelections = snapshot.val() || {};
+    
+    const step = steps[currentStep];
+    if(isStarted && step) {
+        selectedImages = step.slots.map(slotId => {
+            const selection = liveSelections[slotId];
+            if (selection) {
+                const characterEl = document.querySelector(`.character[data-name="${selection.name}"]`);
+                return characterEl;
+            }
+            return null;
+        });
+        renderActiveSlots();
+        updateCharacterPoolVisuals();
+
+        // --- ส่วนที่เพิ่มเข้ามา (สำหรับ Admin) ---
+        const selectedCount = selectedImages.filter(Boolean).length;
+        document.getElementById("confirmBtn").disabled = selectedCount !== step.slots.length;
+    }
+});
+
 
 // Listen for team data changes
 teamDataRef.on("value", snapshot => {
@@ -1504,13 +1526,17 @@ teamReadinessRef.on("value", snapshot => {
 // Listen for slot assignments changes
 slotAssignmentsRef.on("value", snapshot => {
     const assignments = snapshot.val() || {};
-    localSlotAssignments = { ...assignments };
+    // localSlotAssignments = { ...assignments }
+    localSlotAssignments = { ...localSlotAssignments, ...assignments };
     if (isPreparing || assignmentsConfirmed) {
         showPlayerDropdowns(isPreparing);
     }
     if (isPreparing) {
-        checkAssignmentsComplete();
+    checkAssignmentsComplete(assignments); // ส่งตัวแปร assignments เข้าไป
     }
+    // if (isPreparing) {
+    //     checkAssignmentsComplete();
+    // }
 });
 
 // Listen for Firebase connection status
@@ -1543,28 +1569,37 @@ characterPoolRef.once("value").then(snapshot => {
         div.className = "character";
         div.innerHTML = `<img src="${url}" alt="${name}"><div>${name}</div>`;
         div.dataset.name = name;
-        div.onclick = () => {
-            if (!isStarted) return;
-            const step = steps[currentStep];
-            if (!step || currentStep >= steps.length) return;
-            gameStateRef.once("value", gsSnapshot => {
-                const globalUsedNames = Object.values(gsSnapshot.val().slots || {}).map(char => char.name);
-                if (globalUsedNames.includes(name)) return;
-                const existingIndex = selectedImages.findIndex(el => el && el.dataset.name === name);
-                if (existingIndex > -1) {
-                    selectedImages[existingIndex].classList.remove("used");
-                    selectedImages[existingIndex] = null;
-                } else {
-                    let targetIndex = selectedImages.findIndex(el => el === null);
-                    if (targetIndex !== -1) {
-                        selectedImages[targetIndex] = div;
-                        div.classList.add("used");
-                    }
-                }
-                renderActiveSlots();
-                updateCharacterPoolVisuals();
-            });
-        };
+  div.onclick = () => {
+    if (!isStarted) return;
+    const step = steps[currentStep];
+    if (!step || currentStep >= steps.length) return;
+
+    gameStateRef.once("value", gsSnapshot => {
+        const globalUsedNames = Object.values(gsSnapshot.val().slots || {}).map(char => char.name);
+        if (globalUsedNames.includes(name)) return;
+
+        const existingIndex = selectedImages.findIndex(el => el && el.dataset.name === name);
+        if (existingIndex > -1) {
+            selectedImages[existingIndex].classList.remove("used");
+            selectedImages[existingIndex] = null;
+            // เมื่อยกเลิก ให้ส่งค่า null ไปยัง Firebase
+            const slotIdToClear = step.slots[existingIndex];
+            liveSelectionsRef.child(slotIdToClear).set(null);
+        } else {
+            let targetIndex = selectedImages.findIndex(el => el === null);
+            if (targetIndex !== -1) {
+                selectedImages[targetIndex] = div;
+                div.classList.add("used");
+                // เมื่อเลือก ให้ส่งข้อมูลไปยัง Firebase
+                const slotId = step.slots[targetIndex];
+                const selectionData = { name: div.dataset.name, url: div.querySelector('img').src };
+                liveSelectionsRef.child(slotId).set(selectionData);
+            }
+        }
+        renderActiveSlots(); // renderActiveSlots จะถูกเรียกจาก liveSelectionsRef listener แทน
+        updateCharacterPoolVisuals();
+    });
+};
         poolContainer.appendChild(div);
     });
 });
@@ -1573,17 +1608,17 @@ steps.flatMap(step => step.slots).forEach(slotId => {
     const slot = document.getElementById(slotId);
     if (!slot) return;
     slot.addEventListener("click", () => {
+        // ตรวจสอบสิทธิ์การคลิกเหมือนเดิม
         if (!isStarted || currentStep >= steps.length) return;
         const step = steps[currentStep];
         if (!slot.classList.contains("active") || !step.slots.includes(slotId)) return;
+
+        // ตรวจสอบว่าในช่องมีตัวละครที่ถูก pre-select อยู่จริง
         const nameInSlot = slot.querySelector("div")?.textContent;
         if (!nameInSlot) return;
-        const slotIndexInStep = step.slots.indexOf(slotId);
-        if (selectedImages[slotIndexInStep]) {
-            selectedImages[slotIndexInStep] = null;
-        }
-        renderActiveSlots();
-        updateCharacterPoolVisuals();
+
+        // สั่งให้ Firebase อัปเดตช่องนี้เป็นค่าว่างโดยตรง
+        liveSelectionsRef.child(slotId).set(null);
     });
 });
 
