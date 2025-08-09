@@ -1584,52 +1584,66 @@ function showPlayerDropdowns(enableSelection = false) {
 /**
  * Finalizes character selection for the current team when their timer runs out.
  */
-function autoFinalizeStepOnClient() {
+/**
+ * Finalizes character selection for the current team when their timer runs out.
+ * Prioritizes pre-selected characters before picking randomly.
+ */
+async function autoFinalizeStepOnClient() { // ทำให้เป็น async function
     const step = steps[currentStep];
     if (!step || step.team !== thisTeam) return;
 
-    gameStateRef.once("value", snapshot => {
-        const currentGameState = snapshot.val() || {};
-        const confirmedUsedNames = Object.values(currentGameState.slots || {}).map(char => char.name);
+    // ดึงข้อมูลล่าสุดของ gameState และ liveSelections พร้อมกันเพื่อให้ข้อมูลถูกต้องที่สุด
+    const [gameStateSnapshot, liveSelectionsSnapshot] = await Promise.all([
+        gameStateRef.once("value"),
+        liveSelectionsRef.once("value")
+    ]);
 
-        const updates = {};
-        const locallySelectedNames = selectedImages.map(el => el ? el.dataset.name : null);
-        const allUsedNames = [...confirmedUsedNames, ...locallySelectedNames.filter(n => n)];
+    const currentGameState = gameStateSnapshot.val() || {};
+    const currentLiveSelections = liveSelectionsSnapshot.val() || {};
 
-        const available = Object.entries(characterPoolData).filter(([name]) => !allUsedNames.includes(name));
-        
-        updates.reserveA = reserveA;
-        updates.reserveB = reserveB;
+    const confirmedUsedNames = Object.values(currentGameState.slots || {}).map(char => char.name);
+    const preSelectedNamesInTurn = Object.values(currentLiveSelections).map(sel => sel.name);
+    const allUsedNames = [...confirmedUsedNames, ...preSelectedNamesInTurn];
+    
+    // คัดกรองตัวละครที่ยังว่างอยู่จริงๆ
+    let available = Object.entries(characterPoolData).filter(([name]) => !allUsedNames.includes(name));
 
-        step.slots.forEach((slotId, i) => {
-            if (selectedImages[i]) {
-                updates[`slots/${slotId}`] = {
-                    name: selectedImages[i].dataset.name,
-                    url: selectedImages[i].querySelector('img').src
-                };
-            } else {
-                if (available.length > 0) {
-                    const [name, url] = available.splice(Math.floor(Math.random() * available.length), 1)[0];
-                    updates[`slots/${slotId}`] = { name: name, url: url };
-                } else {
-                    console.warn(`No characters left to auto-select for slot ${slotId}.`);
-                }
-            }
-        });
+    const updates = {};
+    updates.reserveA = reserveA;
+    updates.reserveB = reserveB;
 
-        if (currentStep + 1 >= steps.length) {
-            updates.currentStep = currentStep + 1;
-            updates.isStarted = false;
-            updates.isPreparing = true;
-            updates.assignmentsConfirmed = false;
-            updates.timeLeft = 120;
+    step.slots.forEach(slotId => {
+        const preSelection = currentLiveSelections[slotId];
+
+        if (preSelection) {
+            // เงื่อนไขที่ 1: หากมีการเลือกตัวละครไว้ล่วงหน้า ให้ล็อคตัวนั้น
+            updates[`slots/${slotId}`] = preSelection;
         } else {
-            updates.currentStep = currentStep + 1;
-            updates.timeLeft = 30;
-            updates.reserveMode = false;
+            // เงื่อนไขที่ 2: หากไม่มี ให้สุ่มจากตัวละครที่ยังว่างอยู่
+            if (available.length > 0) {
+                const [name, url] = available.splice(Math.floor(Math.random() * available.length), 1)[0];
+                updates[`slots/${slotId}`] = { name: name, url: url };
+            } else {
+                console.warn(`No characters left to auto-select for slot ${slotId}.`);
+            }
         }
-        updateGameState(updates);
     });
+
+    // อัปเดตสถานะเกมเพื่อไปยังเทิร์นถัดไป
+    if (currentStep + 1 >= steps.length) {
+        updates.currentStep = currentStep + 1;
+        updates.isStarted = false;
+        updates.isPreparing = true;
+        updates.assignmentsConfirmed = false;
+        updates.timeLeft = 120;
+    } else {
+        updates.currentStep = currentStep + 1;
+        updates.timeLeft = 30;
+        updates.reserveMode = false;
+    }
+
+    updateGameState(updates);
+    liveSelectionsRef.set({}); // ล้างข้อมูลการเลือกชั่วคราว
 }
 
 
