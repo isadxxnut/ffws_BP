@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Ban/Pick - Display</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 <style>
@@ -15,228 +14,235 @@
   }
 
   body {
-    font-family: 'Inter', sans-serif;
-    background-color: transparent; /* Crucial for overlay */
+    font-family: 'GFF Latin', sans-serif;
+    background-image: url('https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/BP_BO3.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
     color: #e0e0e0;
     margin: 0;
     padding: 0;
     overflow: hidden; /* Prevent any scrolling */
-    width: 1920px;
-    height: 1080px;
+    width: 100vw;
+    height: 100vh;
     box-sizing: border-box;
-    display: flex;
-    justify-content: center;
-    align-items: flex-end;
-  }
-
-  /* Main container to position the UI at the bottom */
-  .overlay-container {
-    width: 100%;
-    max-width: 125rem; /* MODIFIED: Adjusted width for better spacing */
-    display: flex;
-    justify-content: center; /* Center the single bottom bar */
-    padding-bottom: 2rem;
-  }
-
-  .timer-main-box {
     position: relative;
-    top: 0rem; /* MODIFIED: Lift the timer box up */
-    z-index: 10;
-    flex-shrink: 0; /* Prevent timer from shrinking */
-  }
-  
-  .timer-box {
-      width: 22rem; 
-      height: 9rem; 
-      background: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjUwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDI1MCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CiAgPHBhdGggZD0iTTE1IDBIMjM1TDI1MCA1MEwyMzUgMTAwSDE1TDAgNTBMMTUgMFoiIGZpbGw9IiMxRDE5M0UiLz4KPC9zdmc+Cg==') no-repeat center center;
-      background-size: contain;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      text-align: center;
   }
 
+  /* =========================================================================
+  === ADJUSTABLE POSITIONS, SIZES, AND COLORS ===
+  คุณสามารถปรับตำแหน่ง ขนาด และสีของทุกองค์ประกอบได้ที่นี่
+  =========================================================================
+  */
+
+  /* --- LABELS & TIMERS --- */
   #timer {
-    font-size: 4.5rem;
+    position: absolute;
+    top: 56.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 5rem;
     font-weight: 900;
-    color: #aaffaa;
-    line-height: 1;
-    margin-bottom: 0.5rem;
+    color: #ffffff;
+    text-shadow: 0 0 1.5rem rgba(0,0,0,0.7);
   }
   
   #actionLabel {
-    font-size: 1.6rem; 
+    position: absolute;
+    top: 61.2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 3rem; 
     font-weight: 700;
     text-transform: uppercase;
-    color: #8c8cff;
-    height: 1.8rem; /* Reserve space */
-    line-height: 1.8rem;
+    text-shadow: 0 0 1.5rem rgba(0,0,0,0.7);
+  }
+
+  /* Label Colors */
+  #actionLabel.label-pick { color: #6bffb8; }
+  #actionLabel.label-ban { color: #ff6b6b; }
+  #actionLabel.label-select-player { color: #aaffaa; }
+  #actionLabel.label-final {
+    color: #ffffff;
+    font-size: 2.5rem; /* Example: Can be adjusted */
   }
 
   .reserve-display {
+    position: absolute;
+    top: 63.8rem;
+    left: 50%;
+    transform: translateX(-50%);
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 1.2rem;
-    font-size: 1.8rem;
-    font-weight: 700;
-    color: #ddd;
-    text-transform: uppercase;
-    margin-top: -0.5rem; /* Pull it closer to the timer */
-  }
-
-  /* MODIFIED: Style for the new Reserve Time label */
-  .reserve-label {
-      text-align: center;
-      line-height: 1;
-      font-size: 1.5rem;
-  }
-
-  #reserveA, #reserveB {
-    font-size: 2.2rem;
-    color: #fff;
-    font-weight: 900;
-  }
-
-
-  /* Bottom bar containing the team slots */
-  .bottom-bar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center; /* MODIFIED: Vertically align items */
-    width: 100%;
-    padding: 2rem;
-    background-color: rgba(26, 26, 46, 0.95);
-    backdrop-filter: blur(5px);
-    border-radius: 1.5rem;
-    box-shadow: 0 0.5rem 2rem rgba(0,0,0,0.5);
-    border: 0.2rem solid #4a4a5a;
-    box-sizing: border-box;
-  }
-
-  .team {
-    display: flex;
-    gap: 1rem; /* MODIFIED: Reduced gap */
-    flex-wrap: nowrap;
-    justify-content: center;
-    align-items: center;
-  }
-
-  .slot {
-    width: 8.5rem; /* MODIFIED: Reduced width */
-    height: 15rem; 
-    background-color: #2a2a4a;
-    border: 0.3rem solid #444;
-    border-radius: 1rem;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start; 
-    font-weight: bold;
-    font-size: 2.5rem;
-    color: #e0e0e0;
-    overflow: hidden;
-    transition: all 0.3s ease;
-    box-shadow: inset 0 0 1rem rgba(0,0,0,0.3);
-    padding: 0.5rem;
-    box-sizing: border-box;
-    position: relative;
-  }
-
-  .slot.ban {
-    height: 15rem; /* MODIFIED: Make ban slot height equal to pick slot */
-    justify-content: center;
-    font-size: 2rem;
-  }
-
-  .slot.active {
-    border-color: #aaffaa;
-    transform: scale(1.05);
-    box-shadow: 0 0 1.5rem rgba(170, 255, 170, 0.7);
+    width: 25rem;
+    gap: 2rem; /* Adjustable space between reserve times */
+    text-shadow: 0 0 1.5rem rgba(0,0,0,0.7);
   }
   
-  .slot.confirmed {
-    border-color: #8c8cff;
+  #reserveA, #reserveB, .reserve-label {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #fff;
+  }
+  
+  .reserve-label {
+      font-size: 1.8rem;
+      font-weight: 600;
   }
 
-  .slot img {
+  /* --- CHARACTER & PLAYER ELEMENTS --- */
+  .slot-effect, .slot-image-container, .char-name, .player-name {
+    position: absolute;
+    transition: all 0.3s ease;
+  }
+
+  .slot-image-container img {
     width: 100%;
-    height: 8.5rem;
-    object-fit: cover;
-    border-radius: 0.8rem;
-    margin-bottom: 0.5rem;
+    height: 100%;
+    object-fit: contain;
+  }
+  
+  .slot-effect.active {
+    border-color: rgba(255, 215, 0, 0.8); /* Gold color */
+    animation: lightning-flicker 1.5s infinite;
+  }
+  
+  /* Grayscale for confirmed BAN slots */
+  #A0-img.confirmed img,
+  #B0-img.confirmed img {
+    filter: grayscale(100%);
   }
 
-  .slot .char-name {
-    font-size: 1.5rem;
+
+  /* BAN SLOTS */
+  #A0-effect { top: 50.1rem; left: 1.49rem; width: 8.7rem; height: 15.88rem; }
+  #A0-img { top: 51.2rem; left: 1.5rem; width: 9rem; height: 13.5rem; }
+  #A0-char-name { top: 63rem; left: -1.5rem; width: 15rem; font-size: 1.8rem; color: #ffffff; }
+
+  #B0-effect { top: 50.1rem; right: 1.49rem; width: 8.7rem; height: 15.88rem; }
+  #B0-img { top: 51.2rem; right: 1.5rem; width: 9rem; height: 13.5rem; }
+  #B0-char-name { top: 63rem; right: -1.5rem; width: 15rem; font-size: 1.8rem; color: #ffffff; }
+  
+  /* TEAM A PICK SLOTS */
+  #A1-effect { bottom: 1rem; left: 11rem; width: 8.7rem; height: 15.88rem; }
+  #A1-img { bottom: 2.8rem; left: 11rem; width: 9rem; height: 13.5rem; }
+  #A1-char-name { bottom: 2.3rem; left: 8rem; width: 15rem; font-size: 1.8rem; color: #ffffff; }
+  #A1-player-name { bottom: 1.3rem; left: 11.5rem; width: 15rem; font-size: 0.8rem; color: #ffc107; }
+
+  #A2-effect { bottom: 1rem; left: 20.7rem; width: 8.7rem; height: 15.88rem; }
+  #A2-img { bottom: 2.8rem; left: 20.7rem; width: 9rem; height: 13.5rem; }
+  #A2-char-name { bottom: 2.3rem; left: 17.7rem; width: 15rem; font-size: 1.8rem; color: #ffffff; }
+  #A2-player-name { bottom: 1.3rem; left: 21rem; width: 15rem; font-size: 0.8rem; color: #ffc107; }
+
+  #A3-effect { bottom: 1rem; left: 30.1rem; width: 8.7rem; height: 15.88rem; }
+  #A3-img { bottom: 2.8rem; left: 30.1rem; width: 9rem; height: 13.5rem; }
+  #A3-char-name { bottom: 2.3rem; left: 27.1rem; width: 15rem; font-size: 1.8rem; color: #ffffff; }
+  #A3-player-name { bottom: 1.3rem; left: 30.6rem; width: 15rem; font-size: 0.8rem; color: #ffc107; }
+
+  #A4-effect { bottom: 1rem; left: 39.8rem; width: 8.7rem; height: 15.88rem; }
+  #A4-img { bottom: 2.8rem; left: 39.8rem; width: 9rem; height: 13.5rem; }
+  #A4-char-name { bottom: 2.3rem; left: 36.8rem; width: 15rem; font-size: 1.8rem; color: #ffffff; }
+  #A4-player-name { bottom: 1.3rem; left: 40.2rem; width: 15rem; font-size: 0.8rem; color: #ffc107; }
+
+  /* TEAM B PICK SLOTS */
+  #B1-effect { bottom: 1rem; right: 11rem; width: 8.7rem; height: 15.88rem; }
+  #B1-img { bottom: 2.8rem; right: 11rem; width: 9rem; height: 13.5rem; }
+  #B1-char-name { bottom: 2.3rem; right: 8rem; width: 15rem; font-size: 1.8rem; color: #ffffff; }
+  #B1-player-name { bottom: 1.3rem; right: 11.5rem; width: 15rem; font-size: 0.8rem; color: #ffc107; }
+
+  #B2-effect { bottom: 1rem; right: 20.7rem; width: 8.7rem; height: 15.88rem; }
+  #B2-img { bottom: 2.8rem; right: 20.7rem; width: 9rem; height: 13.5rem; }
+  #B2-char-name { bottom: 2.3rem; right: 17.7rem; width: 15rem; font-size: 1.8rem; color: #ffffff; }
+  #B2-player-name { bottom: 1.3rem; right: 21.1rem; width: 15rem; font-size: 0.8rem; color: #ffc107; }
+
+  #B3-effect { bottom: 1rem; right: 30.1rem; width: 8.7rem; height: 15.88rem; }
+  #B3-img { bottom: 2.8rem; right: 30.1rem; width: 9rem; height: 13.5rem; }
+  #B3-char-name { bottom: 2.3rem; right: 27.1rem; width: 15rem; font-size: 1.8rem; color: #ffffff; }
+  #B3-player-name { bottom: 1.3rem; right: 30.7rem; width: 15rem; font-size: 0.8rem; color: #ffc107; }
+
+  #B4-effect { bottom: 1rem; right: 39.8rem; width: 8.7rem; height: 15.88rem; }
+  #B4-img { bottom: 2.8rem; right: 39.8rem; width: 9rem; height: 13.5rem; }
+  #B4-char-name { bottom: 2.3rem; right: 36.8rem; width: 15rem; font-size: 1.8rem; color: #ffffff; }
+  #B4-player-name { bottom: 1.3rem; right: 40.3rem; width: 15rem; font-size: 0.8rem; color: #ffc107; }
+
+  /* =========================================================================
+  === CORE STYLES (Should not need frequent changes) ===
+  =========================================================================
+  */
+
+  .char-name, .player-name {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    width: 95%;
-    text-align: center;
-    color: #e0e0e0;
-    font-weight: 600;
+    text-shadow: 0 0 0.5rem rgba(0,0,0,0.8);
+    z-index: 7;
   }
 
-  .slot .player-name {
-    font-size: 1.3rem;
-    color: #ffc107; 
+  /* Align Character names to the center */
+  .char-name {
     text-align: center;
-    margin-top: auto;
-    width: 100%;
+  }
+
+  /* Align Team A player names to the left */
+  [id^="A"][id$="-player-name"] {
+    text-align: left;
+  }
+
+  /* Align Team B player names to the right */
+  [id^="B"][id$="-player-name"] {
+    text-align: right;
+  }
+  
+  .slot-effect {
+    border: 4px solid transparent;
+    pointer-events: none;
+    z-index: 5;
+    border-radius: 1rem; /* Rounded corners for the effect */
+  }
+
+  .slot-image-container {
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    padding-bottom: 0.3rem;
+    z-index: 6;
   }
 
-  .slot .placeholder-text {
-      opacity: 0.7;
-      text-align: center;
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
+  @keyframes lightning-flicker {
+    0%, 100% { 
+      border-color: rgba(255, 215, 0, 0.8); 
+      box-shadow: 0 0 1.5rem rgba(255, 215, 0, 0.9); 
+    }
+    50% { 
+      border-color: rgba(255, 225, 100, 1); 
+      box-shadow: 0 0 2.5rem rgba(255, 225, 100, 1); 
+    }
+    52% { 
+      border-color: rgba(255, 215, 0, 0.7); 
+      box-shadow: 0 0 1rem rgba(255, 215, 0, 0.8); 
+    }
+    55% { 
+      border-color: rgba(255, 225, 100, 1); 
+      box-shadow: 0 0 2rem rgba(255, 225, 100, 1); 
+    }
   }
 
 </style>
 </head>
 <body>
 
-<div class="overlay-container">
-  
-  <div class="bottom-bar">
-      <div class="team" id="teamA">
-          <div class="slot ban" id="A0"><span class="placeholder-text">BAN</span></div>
-          <div class="slot" id="A1"><span class="placeholder-text">A1</span><div class="player-name"></div></div>
-          <div class="slot" id="A2"><span class="placeholder-text">A2</span><div class="player-name"></div></div>
-          <div class="slot" id="A3"><span class="placeholder-text">A3</span><div class="player-name"></div></div>
-          <div class="slot" id="A4"><span class="placeholder-text">A4</span><div class="player-name"></div></div>
-      </div>
+    <!-- Timer Elements -->
+    <div id="timer">30</div>
+    <div id="actionLabel"></div>
+    <div class="reserve-display">
+      <span id="reserveA">60</span>
+      <span class="reserve-label">Reserve</span>
+      <span id="reserveB">60</span>
+    </div>
+    
+    <!-- Element Containers -->
+    <div id="element-container">
+        <!-- This will be populated by JS -->
+    </div>
 
-      <div class="timer-main-box">
-          <div class="timer-box">
-              <div id="timer">00:30</div>
-              <div id="actionLabel"></div>
-              <div class="reserve-display">
-                <span id="reserveA">60</span>
-                <span class="reserve-label">Reserve<br>Time</span>
-                <span id="reserveB">60</span>
-              </div>
-          </div>
-      </div>
-      
-      <div class="team" id="teamB">
-          <div class="slot ban" id="B0"><span class="placeholder-text">BAN</span></div>
-          <div class="slot" id="B1"><span class="placeholder-text">B1</span><div class="player-name"></div></div>
-          <div class="slot" id="B2"><span class="placeholder-text">B2</span><div class="player-name"></div></div>
-          <div class="slot" id="B3"><span class="placeholder-text">B3</span><div class="player-name"></div></div>
-          <div class="slot" id="B4"><span class="placeholder-text">B4</span><div class="player-name"></div></div>
-      </div>
-  </div>
-
-</div>
 
 <script>
 // Firebase configuration (Same as your admin panel)
@@ -260,6 +266,7 @@ const db = firebase.database();
 const roomRef = db.ref("drafts/room1");
 const gameStateRef = roomRef.child("gameState");
 const slotAssignmentsRef = roomRef.child("slotAssignments");
+const liveSelectionsRef = roomRef.child("liveSelections");
 
 // The sequence of picks and bans
 const steps = [
@@ -272,6 +279,8 @@ const steps = [
     { team: 'A', slots: ['A4'] }
 ];
 
+const allSlotIds = ["A0", "A1", "A2", "A3", "A4", "B0", "B1", "B2", "B3", "B4"];
+
 // Global state variables
 let currentStep = 0;
 let timer = null;
@@ -283,28 +292,59 @@ let isPreparing = false;
 let assignmentsConfirmed = false;
 let countdownStartTime = 0;
 
+function createElements() {
+    const container = document.getElementById('element-container');
+    container.innerHTML = ''; // Clear previous elements
+    allSlotIds.forEach(id => {
+        // Effect container
+        const effectDiv = document.createElement('div');
+        effectDiv.className = 'slot-effect';
+        effectDiv.id = `${id}-effect`;
+        container.appendChild(effectDiv);
+
+        // Image container
+        const imgDiv = document.createElement('div');
+        imgDiv.className = 'slot-image-container';
+        imgDiv.id = `${id}-img`;
+        container.appendChild(imgDiv);
+
+        // Char name
+        const charNameDiv = document.createElement('div');
+        charNameDiv.className = 'char-name';
+        charNameDiv.id = `${id}-char-name`;
+        container.appendChild(charNameDiv);
+
+        // Player name (only for pick slots)
+        if (!id.endsWith('0')) {
+            const playerNameDiv = document.createElement('div');
+            playerNameDiv.className = 'player-name';
+            playerNameDiv.id = `${id}-player-name`;
+            container.appendChild(playerNameDiv);
+        }
+    });
+}
+
 function highlightSlot() {
-    document.querySelectorAll(".slot").forEach(el => el.classList.remove("active"));
+    document.querySelectorAll(".slot-effect").forEach(el => el.classList.remove("active"));
+    const actionLabelEl = document.getElementById("actionLabel");
+    actionLabelEl.className = ''; // Reset classes
+
     const step = steps[currentStep];
     if (!step) return;
 
     step.slots.forEach(id => {
-        const slotEl = document.getElementById(id);
+        const slotEl = document.getElementById(`${id}-effect`);
         if (slotEl) slotEl.classList.add("active");
     });
     
-    // MODIFIED: Only show BAN/PICK text, no turn info
     const slotID = step.slots[0];
-    const actionText = slotID.endsWith("0") ? "BAN" : "PICK";
-    const actionLabelEl = document.getElementById("actionLabel");
-    actionLabelEl.textContent = actionText;
-    actionLabelEl.style.color = actionText === "BAN" ? "#f00" : "#0f0";
+    const isBan = slotID.endsWith("0");
+    actionLabelEl.textContent = isBan ? "BAN" : "PICK";
+    actionLabelEl.classList.add(isBan ? 'label-ban' : 'label-pick');
 }
 
 function updateTimerDisplay() {
-    const min = String(Math.floor(timeLeft / 60)).padStart(2, '0');
-    const sec = String(timeLeft % 60).padStart(2, '0');
-    document.getElementById("timer").textContent = `${min}:${sec}`;
+    document.getElementById("timer").textContent = timeLeft;
     document.getElementById("reserveA").textContent = reserveA;
     document.getElementById("reserveB").textContent = reserveB;
 }
@@ -348,10 +388,31 @@ function startCountdown() {
     }, 1000);
 }
 
-// Listener for game state changes from Firebase
+function clearAllSlots() {
+    allSlotIds.forEach(id => {
+        const effectEl = document.getElementById(`${id}-effect`);
+        const imgEl = document.getElementById(`${id}-img`);
+        const charNameEl = document.getElementById(`${id}-char-name`);
+        const playerNameEl = document.getElementById(`${id}-player-name`);
+
+        if(effectEl) effectEl.classList.remove("active");
+        if(imgEl) {
+            imgEl.innerHTML = '';
+            imgEl.classList.remove("confirmed");
+        }
+        if(charNameEl) charNameEl.textContent = '';
+        if(playerNameEl) playerNameEl.textContent = '';
+    });
+}
+
+// Listener for game state changes from Firebase (Confirmed Picks)
 gameStateRef.on("value", snapshot => {
     const gameState = snapshot.val();
     const actionLabelElement = document.getElementById("actionLabel");
+    const timerElement = document.getElementById("timer");
+    const reserveElement = document.querySelector(".reserve-display");
+
+    actionLabelElement.className = ''; // Reset classes
 
     if (!gameState || (!gameState.isStarted && !gameState.isPreparing && !gameState.assignmentsConfirmed)) {
         isStarted = false;
@@ -363,19 +424,11 @@ gameStateRef.on("value", snapshot => {
         reserveB = 60;
         updateTimerDisplay();
         if (timer) clearInterval(timer);
-        actionLabelElement.textContent = ""; // MODIFIED: Clear label
-        document.getElementById("timer").textContent = "00:30";
-        document.querySelectorAll(".slot").forEach(el => {
-            el.classList.remove("confirmed", "active");
-            const slotId = el.id;
-            const team = slotId.charAt(0);
-            const num = slotId.charAt(1);
-            if (el.classList.contains("ban")) {
-                 el.innerHTML = `<span class="placeholder-text">BAN</span>`;
-            } else {
-                 el.innerHTML = `<span class="placeholder-text">${team}${num}</span><div class="player-name"></div>`;
-            }
-        });
+        actionLabelElement.textContent = "";
+        timerElement.style.display = 'block';
+        reserveElement.style.display = 'flex';
+        timerElement.textContent = "30";
+        clearAllSlots();
         return;
     }
 
@@ -389,60 +442,94 @@ gameStateRef.on("value", snapshot => {
     updateTimerDisplay();
     if (timer) clearInterval(timer);
 
-    document.querySelectorAll(".slot:not(.ban)").forEach(el => {
-        const slotId = el.id;
-        const placeholderText = `${slotId.charAt(0)}${slotId.charAt(1)}`;
-        const existingPlayerName = el.querySelector('.player-name')?.textContent || '';
-        // Clear content but preserve the player name div
-        el.innerHTML = `<span class="placeholder-text">${placeholderText}</span><div class="player-name">${existingPlayerName}</div>`;
-    });
+    // Clear confirmed status before redrawing
+    document.querySelectorAll(".slot-image-container").forEach(el => el.classList.remove("confirmed"));
 
-    document.querySelectorAll(".slot").forEach(el => el.classList.remove("confirmed"));
     if (gameState.slots) {
         for (const slotId in gameState.slots) {
             const char = gameState.slots[slotId];
-            const slot = document.getElementById(slotId);
-            if (char && char.name && char.url && slot) {
-                const playerNameDiv = slot.querySelector('.player-name');
-                slot.innerHTML = `
-                    <img src="${char.url}" alt="${char.name}">
-                    <div class="char-name">${char.name}</div>
-                `;
-                if(playerNameDiv) {
-                    slot.appendChild(playerNameDiv); 
-                }
-                slot.classList.add("confirmed");
+            const imgEl = document.getElementById(`${slotId}-img`);
+            const charNameEl = document.getElementById(`${slotId}-char-name`);
+            if (char && char.name && char.url && imgEl && charNameEl) {
+                imgEl.innerHTML = `<img src="${char.url}" alt="${char.name}">`;
+                charNameEl.textContent = char.name;
+                imgEl.classList.add("confirmed");
             }
         }
     }
+    
+    timerElement.style.display = 'block';
+    reserveElement.style.display = 'flex';
     
     if (isStarted && steps[currentStep]) { 
         highlightSlot();
         startCountdown();
     } else if (isPreparing) {
-        actionLabelElement.textContent = "ASSIGN"; // MODIFIED: Simpler text
-        actionLabelElement.style.color = "#aaffaa";
-        document.querySelectorAll(".slot").forEach(el => el.classList.remove("active"));
+        actionLabelElement.textContent = "SELECT PLAYER";
+        actionLabelElement.classList.add('label-select-player');
+        document.querySelectorAll(".slot-effect").forEach(el => el.classList.remove("active"));
         startCountdown();
     } else if (assignmentsConfirmed) {
-        actionLabelElement.textContent = ""; 
-        document.getElementById("timer").textContent = "00:00";
-        document.querySelectorAll(".slot").forEach(el => el.classList.remove("active"));
+        actionLabelElement.textContent = "Starting soon"; 
+        actionLabelElement.classList.add('label-final');
+        timerElement.style.display = 'none';
+        reserveElement.style.display = 'none';
+        document.querySelectorAll(".slot-effect").forEach(el => el.classList.remove("active"));
     }
 });
 
 // Listener for player assignments
 slotAssignmentsRef.on("value", snapshot => {
     const assignments = snapshot.val() || {};
+     // Clear all player names before updating
     document.querySelectorAll(".player-name").forEach(el => el.textContent = "");
+
     for(const slotId in assignments) {
         const playerName = assignments[slotId];
-        const playerNameEl = document.querySelector(`#${slotId} .player-name`);
+        const playerNameEl = document.getElementById(`${slotId}-player-name`);
         if(playerNameEl) {
             playerNameEl.textContent = playerName;
         }
     }
 });
+
+// Listener for live selections (Real-time display)
+liveSelectionsRef.on("value", snapshot => {
+    if (!isStarted) return;
+    const selections = snapshot.val() || {};
+    const step = steps[currentStep];
+    if (!step) return;
+
+    // Clear previous live selections in the current active slots
+    step.slots.forEach(slotId => {
+        const imgEl = document.getElementById(`${slotId}-img`);
+        const charNameEl = document.getElementById(`${slotId}-char-name`);
+        // Only clear if it's not already confirmed
+        if (imgEl && !imgEl.classList.contains('confirmed')) {
+            imgEl.innerHTML = '';
+        }
+        if (charNameEl && !document.getElementById(`${slotId}-img`).classList.contains('confirmed')) {
+            charNameEl.textContent = '';
+        }
+    });
+
+    // Display new live selections
+    for (const slotId in selections) {
+        // Ensure we only update the slots for the current step
+        if (step.slots.includes(slotId)) {
+            const char = selections[slotId];
+            const imgEl = document.getElementById(`${slotId}-img`);
+            const charNameEl = document.getElementById(`${slotId}-char-name`);
+            if (char && char.name && char.url && imgEl && charNameEl) {
+                imgEl.innerHTML = `<img src="${char.url}" alt="${char.name}">`;
+                charNameEl.textContent = char.name;
+            }
+        }
+    }
+});
+
+// Initial setup
+window.onload = createElements;
 </script>
 </body>
 </html>
