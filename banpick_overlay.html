@@ -131,6 +131,10 @@
   }
   .player-role {
     opacity: 0; /* Roles are also hidden by default */
+    transition: opacity 0.5s ease 0.3s;
+  }
+  .player-role.visible {
+      opacity: 1;
   }
 
   /* --- ปรับตำแหน่งและขนาดข้อมูลการแข่งขันได้ที่นี่ --- */
@@ -219,22 +223,51 @@ const db = firebase.database();
 // Firebase references
 const roomRef = db.ref("drafts/room1");
 const gameStateRef = roomRef.child("gameState");
+const teamDataRef = roomRef.child("teamData");
 const slotAssignmentsRef = roomRef.child("slotAssignments");
 const liveSelectionsRef = roomRef.child("liveSelections");
-const matchInfoRef = roomRef.child("matchInfo"); // New reference
+const matchInfoRef = roomRef.child("matchInfo");
+const firstBanRef = roomRef.child("firstBanTeam");
 
-// Ban/Pick steps
-const steps = [
-    { team: 'A', slots: ['A0'] }, { team: 'B', slots: ['B0'] }, { team: 'A', slots: ['A1'] },
-    { team: 'B', slots: ['B2', 'B1'] }, { team: 'A', slots: ['A2', 'A3'] }, { team: 'B', slots: ['B3', 'B4'] },
-    { team: 'A', slots: ['A4'] }
-];
+// --- START: โครงสร้างโค้ดที่แก้ไขแล้ว ---
+
+// Global state variables and caches
+let timer = null, countdownStartTime = 0;
 const allSlotIds = ["A0", "A1", "A2", "A3", "A4", "B0", "B1", "B2", "B3", "B4"];
+let steps = [];
+let teamData = {};
+let assignments = {};
+let matchInfoData = {};
+let cachedGameState = null;
 
-// Global state variables
-let timer = null, isStarted = false, isPreparing = false, assignmentsConfirmed = false;
-let currentStep = 0, timeLeft = 30, reserveA = 60, reserveB = 60, countdownStartTime = 0;
-let matchInfoData = {}; // To store match info locally
+// ฟังก์ชันสำหรับสร้างลำดับการ Ban/Pick แบบไดนามิก
+function generateSteps(firstBanner) {
+    const secondBanner = firstBanner === 'A' ? 'B' : 'A';
+    return [
+        { team: firstBanner, slots: [`${firstBanner}0`] },
+        { team: secondBanner, slots: [`${secondBanner}0`] },
+        { team: firstBanner, slots: [`${firstBanner}1`] },
+        { team: secondBanner, slots: [`${secondBanner}2`, `${secondBanner}1`] },
+        { team: firstBanner, slots: [`${firstBanner}2`, `${firstBanner}3`] },
+        { team: secondBanner, slots: [`${secondBanner}3`, `${secondBanner}4`] },
+        { team: firstBanner, slots: [`${firstBanner}4`] }
+    ];
+}
+
+// Listener ที่ 1: คอยดึงข้อมูลทีมที่แบนก่อน และสร้าง steps ใหม่
+firstBanRef.on("value", snapshot => {
+    const firstBanTeam = snapshot.val() || 'A';
+    steps = generateSteps(firstBanTeam);
+    renderFullDisplay(); // เมื่อได้ steps แล้ว ให้สั่งแสดงผลใหม่
+});
+
+// Listener ที่ 2: คอยดึงข้อมูลสถานะเกม
+gameStateRef.on("value", snapshot => {
+    cachedGameState = snapshot.val();
+    renderFullDisplay(); // เมื่อ gameState อัปเดต ให้สั่งแสดงผลใหม่
+});
+
+// --- END: โครงสร้างโค้ดที่แก้ไขแล้ว ---
 
 function createElements() {
     const container = document.getElementById('element-container');
@@ -249,7 +282,7 @@ function createElements() {
     });
 }
 
-function highlightSlot() {
+function highlightSlot(currentStep) {
     document.querySelectorAll(".slot-effect").forEach(el => el.classList.remove("active"));
     const actionLabelEl = document.getElementById("actionLabel");
     actionLabelEl.className = '';
@@ -264,35 +297,41 @@ function highlightSlot() {
     actionLabelEl.classList.add(isBan ? 'label-ban' : 'label-pick');
 }
 
-function updateTimerDisplay() {
+function updateTimerDisplay(timeLeft, reserveA, reserveB) {
     document.getElementById("timer").textContent = timeLeft;
     document.getElementById("reserveA").textContent = reserveA;
     document.getElementById("reserveB").textContent = reserveB;
 }
 
-function startCountdown() {
+function startCountdown(timeLeft, reserveA, reserveB, isPreparing, currentStep) {
     clearInterval(timer);
     countdownStartTime = Date.now();
     let initialTimeLeft = timeLeft, initialReserveA = reserveA, initialReserveB = reserveB;
-    const team = steps[currentStep]?.team;
+    const team = (steps[currentStep] || {}).team;
     timer = setInterval(() => {
         const elapsed = Math.floor((Date.now() - countdownStartTime) / 1000);
         let newTimeLeft = initialTimeLeft - elapsed;
+        let currentReserveA = initialReserveA;
+        let currentReserveB = initialReserveB;
+
         if (isPreparing) {
             timeLeft = newTimeLeft > 0 ? newTimeLeft : 0;
-            updateTimerDisplay();
             if (timeLeft <= 0) clearInterval(timer);
-            return;
+        } else {
+            if (newTimeLeft >= 0) {
+                timeLeft = newTimeLeft;
+            } else {
+                timeLeft = 0;
+                const reserveElapsed = -newTimeLeft;
+                if (team === 'A') {
+                    currentReserveA = Math.max(0, initialReserveA - reserveElapsed);
+                } else if (team === 'B') {
+                    currentReserveB = Math.max(0, initialReserveB - reserveElapsed);
+                }
+            }
         }
-        if (newTimeLeft >= 0) { timeLeft = newTimeLeft; } 
-        else {
-            timeLeft = 0;
-            const reserveElapsed = -newTimeLeft;
-            if (team === 'A') { reserveA = Math.max(0, initialReserveA - reserveElapsed); } 
-            else if (team === 'B') { reserveB = Math.max(0, initialReserveB - reserveElapsed); }
-        }
-        updateTimerDisplay();
-        if (timeLeft <= 0 && ((team === 'A' && reserveA <= 0) || (team === 'B' && reserveB <= 0))) {
+        updateTimerDisplay(timeLeft, currentReserveA, currentReserveB);
+        if (timeLeft <= 0 && ((team === 'A' && currentReserveA <= 0) || (team === 'B' && currentReserveB <= 0))) {
             clearInterval(timer);
         }
     }, 1000);
@@ -307,113 +346,77 @@ function clearAllSlots() {
         if(effectEl) effectEl.classList.remove("active");
         if(imgEl) { imgEl.innerHTML = ''; imgEl.classList.remove("confirmed"); }
         if(charNameEl) charNameEl.textContent = '';
-        if(playerNameEl) playerNameEl.textContent = '';
+        if(playerNameEl) {
+             playerNameEl.textContent = '';
+             playerNameEl.classList.remove('visible');
+        }
+        const roleEl = document.getElementById(`${id}-role`);
+        if(roleEl){
+            roleEl.classList.remove('visible');
+            roleEl.querySelector('img').src = '';
+        }
     });
 }
 
-// Listener for game state
-gameStateRef.on("value", snapshot => {
-    const gameState = snapshot.val();
-    const actionLabelElement = document.getElementById("actionLabel");
-    const timerElement = document.getElementById("timer");
-    const reserveElement = document.querySelector(".reserve-display");
-    const allPlayerNames = document.querySelectorAll(".player-name");
-    const arrowA = document.getElementById('arrow-container-A'), arrowB = document.getElementById('arrow-container-B');
-    const arrowDivA = document.getElementById('turnArrowA'), arrowDivB = document.getElementById('turnArrowB');
+function updatePlayerDisplays(assignmentsConfirmed) {
+    document.querySelectorAll(".player-name").forEach(el => el.classList.remove('visible'));
+    document.querySelectorAll(".player-role").forEach(el => el.classList.remove('visible'));
 
-    actionLabelElement.className = ''; 
-    arrowA.style.display = 'none'; arrowB.style.display = 'none';
-    arrowDivA.className = 'turn-arrow'; arrowDivB.className = 'turn-arrow';
+    if (!assignmentsConfirmed) return;
 
-    if (!gameState || (!gameState.isStarted && !gameState.isPreparing && !gameState.assignmentsConfirmed)) {
-        isStarted = isPreparing = assignmentsConfirmed = false;
-        currentStep = 0; timeLeft = 30; reserveA = 60; reserveB = 60;
-        updateTimerDisplay();
-        if (timer) clearInterval(timer);
-        actionLabelElement.textContent = "";
-        timerElement.style.display = 'block';
-        reserveElement.style.display = 'flex';
-        timerElement.textContent = "30";
-        allPlayerNames.forEach(el => el.classList.remove('visible'));
-        clearAllSlots();
-        return;
-    }
+    const playerToRoleKeyMap = {};
+    (teamData.playersA || []).forEach((name, index) => { if (name) playerToRoleKeyMap[name] = `A_${index}`; });
+    (teamData.playersB || []).forEach((name, index) => { if (name) playerToRoleKeyMap[name] = `B_${index}`; });
 
-    ({ isStarted, isPreparing, assignmentsConfirmed, currentStep, timeLeft, reserveA, reserveB } = gameState);
-    updateTimerDisplay();
-    if (timer) clearInterval(timer);
+    for (const slotId in assignments) {
+        const playerName = assignments[slotId];
+        if (!playerName) continue;
 
-    document.querySelectorAll(".slot-image-container").forEach(el => el.classList.remove("confirmed"));
-    if (gameState.slots) {
-        for (const slotId in gameState.slots) {
-            const char = gameState.slots[slotId];
-            const imgEl = document.getElementById(`${slotId}-img`);
-            const charNameEl = document.getElementById(`${slotId}-char-name`);
-            if (char && char.name && char.url && imgEl && charNameEl) {
-                imgEl.innerHTML = `<img src="${char.url}" alt="${char.name}">`;
-                charNameEl.textContent = char.name;
-                imgEl.classList.add("confirmed");
+        const playerNameEl = document.getElementById(`${slotId}-player-name`);
+        if (playerNameEl) {
+            playerNameEl.textContent = playerName;
+            playerNameEl.classList.add('visible');
+        }
+
+        if (matchInfoData.showRoles) {
+            const roleKey = playerToRoleKeyMap[playerName];
+            const roleUrl = (matchInfoData.roles || {})[roleKey] || '';
+            const roleEl = document.getElementById(`${slotId}-role`);
+            if (roleEl) {
+                roleEl.querySelector('img').src = roleUrl;
+                roleEl.classList.add('visible');
             }
         }
     }
-    
-    timerElement.style.display = 'block';
-    reserveElement.style.display = 'flex';
-    
-    if (isStarted && steps[currentStep]) { 
-        allPlayerNames.forEach(el => el.classList.remove('visible'));
-        document.querySelectorAll('.player-role').forEach(el => el.classList.remove('visible'));
-        highlightSlot();
-        startCountdown();
-        const step = steps[currentStep];
-        const isBan = step.slots[0].endsWith("0");
-        const activeArrowContainer = step.team === 'A' ? arrowA : arrowB;
-        const activeArrowDiv = step.team === 'A' ? arrowDivA : arrowDivB;
-        activeArrowContainer.style.display = 'block';
-        activeArrowDiv.classList.add(isBan ? 'arrow-ban' : 'arrow-pick');
-    } else if (isPreparing) {
-        allPlayerNames.forEach(el => el.classList.remove('visible'));
-        document.querySelectorAll('.player-role').forEach(el => el.classList.remove('visible'));
-        actionLabelElement.textContent = "SELECT PLAYER";
-        actionLabelElement.classList.add('label-select-player');
-        document.querySelectorAll(".slot-effect").forEach(el => el.classList.remove("active"));
-        reserveElement.style.display = 'none';
-        startCountdown();
-    } else if (assignmentsConfirmed) {
-        actionLabelElement.textContent = "Starting soon"; 
-        actionLabelElement.classList.add('label-final');
-        timerElement.style.display = 'none';
-        reserveElement.style.display = 'none';
-        document.querySelectorAll(".slot-effect").forEach(el => el.classList.remove("active"));
-        allPlayerNames.forEach(el => el.classList.add('visible'));
-        if (matchInfoData.showRoles) {
-            document.querySelectorAll('.player-role').forEach(el => el.classList.add('visible'));
-        }
+}
+
+teamDataRef.on("value", snapshot => {
+    teamData = snapshot.val() || {};
+    if (cachedGameState) {
+      updatePlayerDisplays(cachedGameState.assignmentsConfirmed);
     }
 });
 
-// Listener for player assignments
 slotAssignmentsRef.on("value", snapshot => {
-    const assignments = snapshot.val() || {};
-    document.querySelectorAll(".player-name").forEach(el => el.textContent = "");
-    for(const slotId in assignments) {
-        const playerNameEl = document.getElementById(`${slotId}-player-name`);
-        if(playerNameEl) playerNameEl.textContent = assignments[slotId];
+    assignments = snapshot.val() || {};
+    if (cachedGameState) {
+      updatePlayerDisplays(cachedGameState.assignmentsConfirmed);
     }
 });
 
-// Listener for live selections
 liveSelectionsRef.on("value", snapshot => {
-    if (!isStarted) return;
+    if (!cachedGameState || !cachedGameState.isStarted || steps.length === 0) return;
     const selections = snapshot.val() || {};
-    const step = steps[currentStep];
+    const step = steps[cachedGameState.currentStep];
     if (!step) return;
+
     step.slots.forEach(slotId => {
         const imgEl = document.getElementById(`${slotId}-img`);
         const charNameEl = document.getElementById(`${slotId}-char-name`);
         if (imgEl && !imgEl.classList.contains('confirmed')) imgEl.innerHTML = '';
         if (charNameEl && !document.getElementById(`${slotId}-img`).classList.contains('confirmed')) charNameEl.textContent = '';
     });
+
     for (const slotId in selections) {
         if (step.slots.includes(slotId)) {
             const char = selections[slotId];
@@ -427,11 +430,9 @@ liveSelectionsRef.on("value", snapshot => {
     }
 });
 
-// NEW Listener for match info
 matchInfoRef.on("value", snapshot => {
     matchInfoData = snapshot.val() || {};
     
-    // Update content
     document.getElementById('teamANameOverlay').textContent = matchInfoData.teamAName || '';
     document.getElementById('teamBNameOverlay').textContent = matchInfoData.teamBName || '';
     document.getElementById('teamAScoreOverlay').textContent = matchInfoData.teamAScore || 0;
@@ -440,17 +441,7 @@ matchInfoRef.on("value", snapshot => {
     document.getElementById('teamBLogoOverlay').querySelector('img').src = matchInfoData.teamBLogoUrl || '';
     document.getElementById('teamAFlagOverlay').querySelector('img').src = matchInfoData.teamAFlagUrl || '';
     document.getElementById('teamBFlagOverlay').querySelector('img').src = matchInfoData.teamBFlagUrl || '';
-    
-    if (matchInfoData.roles) {
-        for (const slotId in matchInfoData.roles) {
-            const roleImgEl = document.getElementById(`${slotId}-role`)?.querySelector('img');
-            if (roleImgEl) {
-                roleImgEl.src = matchInfoData.roles[slotId] || '';
-            }
-        }
-    }
 
-    // Update visibility
     const mainInfoElements = document.querySelectorAll('#teamANameOverlay, #teamBNameOverlay, #teamAScoreOverlay, #teamBScoreOverlay, #teamALogoOverlay, #teamBLogoOverlay, #teamAFlagOverlay, #teamBFlagOverlay');
     if (matchInfoData.showInfo) {
         mainInfoElements.forEach(el => el.classList.add('visible'));
@@ -458,17 +449,94 @@ matchInfoRef.on("value", snapshot => {
         mainInfoElements.forEach(el => el.classList.remove('visible'));
     }
 
-    const roleElements = document.querySelectorAll('.player-role');
-    if (matchInfoData.showRoles && assignmentsConfirmed) {
-        roleElements.forEach(el => el.classList.add('visible'));
-    } else {
-        roleElements.forEach(el => el.classList.remove('visible'));
+    if (cachedGameState) {
+        updatePlayerDisplays(cachedGameState.assignmentsConfirmed);
     }
 });
 
+// <<< MAIN RENDER FUNCTION >>>
+// ฟังก์ชันกลางที่จะถูกเรียกใช้ทุกครั้งที่ข้อมูลมีการเปลี่ยนแปลง
+function renderFullDisplay() {
+    // Guard Clause: จะไม่ทำงานจนกว่าข้อมูลที่จำเป็นจะมาครบ (ทั้ง gameState และ steps)
+    if (!cachedGameState || steps.length === 0) {
+        // ถ้ายังไม่พร้อม ให้แสดงสถานะเริ่มต้นไปก่อน
+        clearAllSlots();
+        updateTimerDisplay(30, 60, 60);
+        document.getElementById("actionLabel").textContent = "";
+        return;
+    }
+
+    const { isStarted, isPreparing, assignmentsConfirmed, currentStep, timeLeft, reserveA, reserveB } = cachedGameState;
+    const actionLabelElement = document.getElementById("actionLabel");
+    const timerElement = document.getElementById("timer");
+    const reserveElement = document.querySelector(".reserve-display");
+    const arrowA = document.getElementById('arrow-container-A'), arrowB = document.getElementById('arrow-container-B');
+    const arrowDivA = document.getElementById('turnArrowA'), arrowDivB = document.getElementById('turnArrowB');
+
+    actionLabelElement.className = '';
+    arrowA.style.display = 'none'; arrowB.style.display = 'none';
+    arrowDivA.className = 'turn-arrow'; arrowDivB.className = 'turn-arrow';
+
+    if (!isStarted && !isPreparing && !assignmentsConfirmed) {
+        if (timer) clearInterval(timer);
+        actionLabelElement.textContent = "";
+        timerElement.style.display = 'block';
+        reserveElement.style.display = 'flex';
+        clearAllSlots();
+        updateTimerDisplay(30, 60, 60);
+        return;
+    }
+
+    if (timer) clearInterval(timer);
+    
+    document.querySelectorAll(".slot-image-container").forEach(el => el.classList.remove("confirmed"));
+    if (cachedGameState.slots) {
+        for (const slotId in cachedGameState.slots) {
+            const char = cachedGameState.slots[slotId];
+            const imgEl = document.getElementById(`${slotId}-img`);
+            const charNameEl = document.getElementById(`${slotId}-char-name`);
+            if (char && char.name && char.url && imgEl && charNameEl) {
+                imgEl.innerHTML = `<img src="${char.url}" alt="${char.name}">`;
+                charNameEl.textContent = char.name;
+                imgEl.classList.add("confirmed");
+            }
+        }
+    }
+    
+    updatePlayerDisplays(assignmentsConfirmed);
+
+    timerElement.style.display = 'block';
+    reserveElement.style.display = 'flex';
+    
+    if (isStarted && steps[currentStep]) { 
+        highlightSlot(currentStep);
+        startCountdown(timeLeft, reserveA, reserveB, isPreparing, currentStep);
+        const step = steps[currentStep];
+        const isBan = step.slots[0].endsWith("0");
+        const activeArrowContainer = step.team === 'A' ? arrowA : arrowB;
+        const activeArrowDiv = step.team === 'A' ? arrowDivA : arrowDivB;
+        activeArrowContainer.style.display = 'block';
+        activeArrowDiv.classList.add(isBan ? 'arrow-ban' : 'arrow-pick');
+    } else if (isPreparing) {
+        actionLabelElement.textContent = "SELECT PLAYER";
+        actionLabelElement.classList.add('label-select-player');
+        document.querySelectorAll(".slot-effect").forEach(el => el.classList.remove("active"));
+        reserveElement.style.display = 'none';
+        startCountdown(timeLeft, reserveA, reserveB, isPreparing, currentStep);
+    } else if (assignmentsConfirmed) {
+        actionLabelElement.textContent = "Starting soon"; 
+        actionLabelElement.classList.add('label-final');
+        timerElement.style.display = 'none';
+        reserveElement.style.display = 'none';
+        document.querySelectorAll(".slot-effect").forEach(el => el.classList.remove("active"));
+    }
+    
+    updateTimerDisplay(timeLeft, reserveA, reserveB);
+}
 
 // Initial setup
 window.onload = createElements;
 </script>
 </body>
 </html>
+
