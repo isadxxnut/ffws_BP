@@ -877,6 +877,19 @@
   </div>
 </div>
 
+<div class="controls" style="margin-bottom: 1.2rem; background: #2a2a4a; padding: 0.8rem; border-radius: 0.5rem; width: auto; gap: 1.5rem;">
+    <strong style="font-size: 1.1rem; color: #e0e0e0;">First Ban:</strong>
+    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 1.1rem;">
+        <input type="radio" name="firstBan" value="A" checked style="width: 1.5rem; height: 1.5rem;"> Team A
+    </label>
+    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 1.1rem;">
+        <input type="radio" name="firstBan" value="B" style="width: 1.5rem; height: 1.5rem;"> Team B
+    </label>
+</div>
+
+<div class="teams">
+    </div>
+
 <div class="teams">
     <div class="team" id="teamA">
         <div class="slot ban" id="A0">
@@ -970,8 +983,25 @@ const teamReadinessRef = roomRef.child("teamReadiness"); // Reference for team r
 const slotAssignmentsRef = roomRef.child("slotAssignments"); // Reference for player assignments to slots
 const liveSelectionsRef = roomRef.child("liveSelections");
 
+const firstBanRef = roomRef.child("firstBanTeam"); // Reference ใหม่สำหรับเก็บทีมที่แบนก่อน
+
+// ฟังก์ชันสำหรับสร้างลำดับการ Ban/Pick แบบไดนามิก
+function generateSteps(firstBanner) {
+    const secondBanner = firstBanner === 'A' ? 'B' : 'A';
+    // คืนค่าลำดับการเดินเกมตามทีมที่ได้แบนก่อน
+    return [
+        { team: firstBanner, slots: [`${firstBanner}0`] },
+        { team: secondBanner, slots: [`${secondBanner}0`] },
+        { team: firstBanner, slots: [`${firstBanner}1`] },
+        { team: secondBanner, slots: [`${secondBanner}2`, `${secondBanner}1`] },
+        { team: firstBanner, slots: [`${firstBanner}2`, `${firstBanner}3`] },
+        { team: secondBanner, slots: [`${secondBanner}3`, `${secondBanner}4`] },
+        { team: firstBanner, slots: [`${firstBanner}4`] }
+    ];
+}
+
 // Define the steps of the ban/pick process
-const steps = [
+let steps = [
     { team: 'A', slots: ['A0'] }, // Team A bans 1 character
     { team: 'B', slots: ['B0'] }, // Team B bans 1 character
     { team: 'A', slots: ['A1'] }, // Team A picks 1 character
@@ -1189,9 +1219,29 @@ function startCountdown() {
     }, 1000);
 }
 
+// เมื่อแอดมินคลิกเลือกทีม ระบบจะอัปเดตค่าใน Firebase ทันที
+document.querySelectorAll('input[name="firstBan"]').forEach(radio => {
+    radio.addEventListener('change', (event) => {
+        if(event.target.checked) {
+            firstBanRef.set(event.target.value);
+        }
+    });
+});
+
+// ตั้งค่าเริ่มต้นเมื่อโหลดหน้า
+firstBanRef.once('value', snapshot => {
+    const firstBanTeam = snapshot.val() || 'A';
+    document.querySelector(`input[name="firstBan"][value="${firstBanTeam}"]`).checked = true;
+});
 
 // Event listener for the "Start Game" button
 document.getElementById("startBtn").onclick = () => {
+    
+    // โค้ดที่เพิ่มเข้ามา
+    const firstBanTeam = document.querySelector('input[name="firstBan"]:checked').value;
+    firstBanRef.set(firstBanTeam); // บันทึกค่าสุดท้ายก่อนเริ่ม
+    steps = generateSteps(firstBanTeam); // สร้างลำดับการเดินเกม
+
     clearInterval(timer);
     const updates = {
         isStarted: true,
@@ -1287,6 +1337,12 @@ document.getElementById("clearHeroBtn").onclick = () => {
 document.getElementById("confirmClearHeroYes").onclick = () => {
     document.getElementById("clearHeroConfirmModal").style.display = 'none';
     clearInterval(timer);
+
+// --- โค้ดที่เพิ่มเข้ามา ---
+    firstBanRef.set('A'); // 1. รีเซ็ตค่าใน Firebase กลับไปเป็น 'A'
+    document.querySelector('input[name="firstBan"][value="A"]').checked = true; // 2. อัปเดต UI ให้ตรงกัน
+    // --- สิ้นสุดโค้ดที่เพิ่มเข้ามา ---
+
     const updates = {
         isStarted: false,
         isPreparing: false,
@@ -1359,6 +1415,10 @@ document.getElementById("readyBtnB").onclick = () => {
 
 // Main listener for game state changes from Firebase
 gameStateRef.on("value", snapshot => {
+
+// เพิ่มโค้ดนี้เข้าไปใน gameStateRef.on
+
+
     prevCurrentStep = currentStep;
     gameState = snapshot.val();
     const teamAReadyStatusSpan = document.getElementById("teamAReady");
@@ -1402,6 +1462,13 @@ gameStateRef.on("value", snapshot => {
     reserveB = gameState.reserveB;
     reserveMode = gameState.reserveMode;
     updateTimerDisplay();
+
+const firstBanRadios = document.querySelectorAll('input[name="firstBan"]');
+if (isStarted || isPreparing || assignmentsConfirmed) {
+    firstBanRadios.forEach(radio => radio.disabled = true);
+} else {
+    firstBanRadios.forEach(radio => radio.disabled = false);
+}
 
     // Base Draw: Clear and redraw all slots and confirmed picks
     document.querySelectorAll(".slot").forEach(el => {
@@ -1455,7 +1522,14 @@ gameStateRef.on("value", snapshot => {
         syncDotB.classList.add("connected"); syncDotB.classList.remove("disconnected");
         teamAReadyStatusSpan.textContent = "Ready";
         teamBReadyStatusSpan.textContent = "Ready";
-    } else if (isPreparing) { // Preparing phase
+    
+    if (isStarted && steps[currentStep]) {
+    // นี่คือช่วง Ban/Pick
+    document.getElementById("confirmBtn").disabled = true; // << บรรทัดแก้ไข: ปิดปุ่มไว้ก่อนเสมอเมื่อเริ่มรอบ
+    document.getElementById("confirmPlayerAssignmentBtn").style.display = 'none';
+}
+
+      } else if (isPreparing) { // Preparing phase
         turnInfoElement.textContent = "Preparing";
         document.getElementById("actionLabel").textContent = "";
         reserveStatusElement.textContent = "Preparing Time";
