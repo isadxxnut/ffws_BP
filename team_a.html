@@ -961,7 +961,6 @@ const firebaseConfig = {
 
 
 
-
     firebase.initializeApp(firebaseConfig);
 }
 const db = firebase.database();
@@ -975,8 +974,23 @@ const teamReadinessRef = roomRef.child("teamReadiness"); // Reference for team r
 const slotAssignmentsRef = roomRef.child("slotAssignments"); // Reference for player assignments to slots
 const liveSelectionsRef = roomRef.child("liveSelections");
 
+const firstBanRef = roomRef.child("firstBanTeam");
+
+function generateSteps(firstBanner) {
+    const secondBanner = firstBanner === 'A' ? 'B' : 'A';
+    return [
+        { team: firstBanner, slots: [`${firstBanner}0`] },
+        { team: secondBanner, slots: [`${secondBanner}0`] },
+        { team: firstBanner, slots: [`${firstBanner}1`] },
+        { team: secondBanner, slots: [`${secondBanner}2`, `${secondBanner}1`] },
+        { team: firstBanner, slots: [`${firstBanner}2`, `${firstBanner}3`] },
+        { team: secondBanner, slots: [`${secondBanner}3`, `${secondBanner}4`] },
+        { team: firstBanner, slots: [`${firstBanner}4`] }
+    ];
+}
+
 // Define the steps of the ban/pick process
-const steps = [
+let steps = [
     { team: 'A', slots: ['A0'] }, // Team A bans 1 character
     { team: 'B', slots: ['B0'] }, // Team B bans 1 character
     { team: 'A', slots: ['A1'] }, // Team A picks 1 character
@@ -1198,6 +1212,11 @@ document.getElementById("readyBtnA").onclick = () => {
     teamReadinessRef.update({ teamA: !teamAReady });
 };
 
+// รับค่าทีมที่แบนก่อนจาก Firebase
+firstBanRef.on("value", snapshot => {
+    const firstBanTeam = snapshot.val() || 'A'; // ถ้าไม่มีค่า ให้ใช้ 'A' เป็นค่าเริ่มต้น
+    steps = generateSteps(firstBanTeam);
+});
 
 // Main listener for game state changes from Firebase
 gameStateRef.on("value", snapshot => {
@@ -1298,7 +1317,7 @@ gameStateRef.on("value", snapshot => {
         renderActiveSlots();
         if (timer) clearInterval(timer);
         startCountdown();
-        confirmButton.disabled = !isMyTurn;
+        confirmButton.disabled = true;
         syncDotA.classList.add("connected"); syncDotA.classList.remove("disconnected");
         syncDotB.classList.add("connected"); syncDotB.classList.remove("disconnected");
         teamAReadyStatusSpan.textContent = "Ready";
