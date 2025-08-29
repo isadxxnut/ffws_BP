@@ -115,30 +115,11 @@ const db = firebase.database();
 // Firebase references
 const roomRef = db.ref("drafts/room1");
 const teamDataRef = roomRef.child("teamData");
-const slotAssignmentsRef = roomRef.child("slotAssignments");
 const matchInfoRef = roomRef.child("matchInfo");
 
 // Data URLs
 const teamLogos = {
-    "NONE": "",
-    "BRU": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/BRU.png",
-    "RRQ": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/RRQ.png",
-    "HEV": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/HEV.png",
-    "EVOS": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/EVOS.png",
-    "PR": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/PR.png",
-    "FLCN": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/FLCN.png",
-    "BTR": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/BTR.png",
-    "MEC": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/MEC.png",
-    "AGAL": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/AGAL.png",
-    "TDK": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/TDK.png",
-    "FL": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/FL.png",
-    "ONIC": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/ONIC.png",
-    "VP": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/VP.png",
-    "WAG": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/WAG.png",
-    "PE": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/PE.png",
-    "EXP": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/EXP.png",
-    "KAGE": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/KAGE.png",
-    "GOW": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/GOW.png"
+    "NONE": "", "BRU": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/BRU.png", "RRQ": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/RRQ.png", "HEV": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/HEV.png", "EVOS": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/EVOS.png", "PR": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/PR.png", "FLCN": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/FLCN.png", "BTR": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/BTR.png", "MEC": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/MEC.png", "AGAL": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/AGAL.png", "TDK": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/TDK.png", "FL": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/FL.png", "ONIC": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/ONIC.png", "VP": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/VP.png", "WAG": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/WAG.png", "PE": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/PE.png", "EXP": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/EXP.png", "KAGE": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/KAGE.png", "GOW": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/GOW.png"
 };
 const flags = {
     "NONE": "", "MY": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/FLAG/MY.png", "ID": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/FLAG/ID.png", "TH": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/FLAG/TH.png", "VN": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/FLAG/VN.png"
@@ -159,8 +140,9 @@ function populateDropdown(selectElement, optionsObject) {
 
 function updateMatchInfo() {
     const rolesData = {};
+    // This now reads from our new data-role-key attribute
     document.querySelectorAll('.player-role-select select').forEach(select => {
-        rolesData[select.dataset.slot] = select.value;
+        rolesData[select.dataset.roleKey] = select.value;
     });
 
     const data = {
@@ -174,7 +156,7 @@ function updateMatchInfo() {
         teamBLogoUrl: document.getElementById('teamBLogo').value,
         showInfo: document.getElementById('showInfoToggle').checked,
         showRoles: document.getElementById('showRolesToggle').checked,
-        roles: rolesData
+        roles: rolesData // Save the new roles structure
     };
     matchInfoRef.set(data);
 }
@@ -185,7 +167,7 @@ populateDropdown(document.getElementById('teamBFlag'), flags);
 populateDropdown(document.getElementById('teamALogo'), teamLogos);
 populateDropdown(document.getElementById('teamBLogo'), teamLogos);
 
-// Sync team data from admin panel
+// Sync team data from admin panel for display
 teamDataRef.on('value', snapshot => {
     const data = snapshot.val() || {};
     document.getElementById('teamANameDisplay').textContent = data.teamAName || 'Team A';
@@ -193,18 +175,19 @@ teamDataRef.on('value', snapshot => {
     updateMatchInfo(); // Update team names in matchInfo as well
 });
 
-// Sync player list and create role dropdowns
-slotAssignmentsRef.on('value', snapshot => {
-    const assignments = snapshot.val() || {};
+// NEW: Sync player list directly from teamData to allow pre-assignment of roles
+teamDataRef.on('value', snapshot => {
+    const teamData = snapshot.val() || {};
     const teamAPlayersDiv = document.getElementById('teamAPlayers');
     const teamBPlayersDiv = document.getElementById('teamBPlayers');
-    
+
+    // Clear existing player lists
     teamAPlayersDiv.innerHTML = '<h2>Players</h2>';
     teamBPlayersDiv.innerHTML = '<h2>Players</h2>';
 
-    for (const slotId in assignments) {
-        const playerName = assignments[slotId];
-        if (!playerName) continue;
+    // Function to create a player item with a role dropdown
+    const createPlayerItem = (playerName, teamPrefix, playerIndex) => {
+        if (!playerName) return null; // Skip if player name is empty
 
         const playerItem = document.createElement('div');
         playerItem.className = 'player-item';
@@ -215,9 +198,10 @@ slotAssignmentsRef.on('value', snapshot => {
 
         const roleSelectContainer = document.createElement('div');
         roleSelectContainer.className = 'player-role-select';
-        
+
         const roleSelect = document.createElement('select');
-        roleSelect.dataset.slot = slotId;
+        // IMPORTANT: We now use a key based on team and player index, e.g., "A_0", "B_1"
+        roleSelect.dataset.roleKey = `${teamPrefix}_${playerIndex}`;
         populateDropdown(roleSelect, roles);
         roleSelect.onchange = updateMatchInfo;
 
@@ -225,25 +209,35 @@ slotAssignmentsRef.on('value', snapshot => {
         playerItem.appendChild(nameSpan);
         playerItem.appendChild(roleSelectContainer);
 
-        if (slotId.startsWith('A')) {
-            teamAPlayersDiv.appendChild(playerItem);
-        } else if (slotId.startsWith('B')) {
-            teamBPlayersDiv.appendChild(playerItem);
-        }
-    }
-    // After creating dropdowns, sync their values with Firebase
+        return playerItem;
+    };
+
+    // Populate Team A players
+    (teamData.playersA || []).forEach((name, index) => {
+        const item = createPlayerItem(name, 'A', index);
+        if (item) teamAPlayersDiv.appendChild(item);
+    });
+
+    // Populate Team B players
+    (teamData.playersB || []).forEach((name, index) => {
+        const item = createPlayerItem(name, 'B', index);
+        if (item) teamBPlayersDiv.appendChild(item);
+    });
+
+    // After creating dropdowns, sync their values with existing data in Firebase
     matchInfoRef.once('value', syncSnapshot => {
         const info = syncSnapshot.val() || {};
         if (info.roles) {
-            for (const slotId in info.roles) {
-                const select = document.querySelector(`select[data-slot="${slotId}"]`);
+            for (const roleKey in info.roles) {
+                const select = document.querySelector(`select[data-role-key="${roleKey}"]`);
                 if (select) {
-                    select.value = info.roles[slotId];
+                    select.value = info.roles[roleKey];
                 }
             }
         }
     });
 });
+
 
 // Sync controls with Firebase data
 matchInfoRef.on('value', snapshot => {
@@ -258,10 +252,10 @@ matchInfoRef.on('value', snapshot => {
     document.getElementById('showRolesToggle').checked = data.showRoles || false;
 
     if (data.roles) {
-        for (const slotId in data.roles) {
-            const select = document.querySelector(`select[data-slot="${slotId}"]`);
+        for (const roleKey in data.roles) {
+            const select = document.querySelector(`select[data-role-key="${roleKey}"]`);
             if (select) {
-                select.value = data.roles[slotId];
+                select.value = data.roles[roleKey];
             }
         }
     }
