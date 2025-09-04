@@ -359,23 +359,30 @@ function clearAllSlots() {
 }
 
 function updatePlayerDisplays(assignmentsConfirmed) {
+    // ซ่อนทุกอย่างก่อนเริ่ม
     document.querySelectorAll(".player-name").forEach(el => el.classList.remove('visible'));
     document.querySelectorAll(".player-role").forEach(el => el.classList.remove('visible'));
 
     if (!assignmentsConfirmed) return;
 
+    // สร้าง Map สำหรับหา role key จากชื่อผู้เล่น เพื่อประสิทธิภาพที่ดีขึ้น
     const playerToRoleKeyMap = {};
     (teamData.playersA || []).forEach((name, index) => { if (name) playerToRoleKeyMap[name] = `A_${index}`; });
     (teamData.playersB || []).forEach((name, index) => { if (name) playerToRoleKeyMap[name] = `B_${index}`; });
+    
+    // --- จุดที่แก้ไข ---
+    // 1. เตรียม Element ที่จะแสดงผลทั้งหมดไว้ใน Array ก่อน
+    const elementsToShow = [];
 
     for (const slotId in assignments) {
         const playerName = assignments[slotId];
         if (!playerName) continue;
 
+        // 1.1 เปลี่ยนข้อมูล Text และ Image Source ให้เสร็จสิ้นก่อน
         const playerNameEl = document.getElementById(`${slotId}-player-name`);
         if (playerNameEl) {
             playerNameEl.textContent = playerName;
-            playerNameEl.classList.add('visible');
+            elementsToShow.push(playerNameEl); // เพิ่ม Element เข้าไปใน Array
         }
 
         if (matchInfoData.showRoles) {
@@ -384,10 +391,20 @@ function updatePlayerDisplays(assignmentsConfirmed) {
             const roleEl = document.getElementById(`${slotId}-role`);
             if (roleEl) {
                 roleEl.querySelector('img').src = roleUrl;
-                roleEl.classList.add('visible');
+                if (roleUrl) { // จะแสดงผลก็ต่อเมื่อมี URL ของ role
+                    elementsToShow.push(roleEl); // เพิ่ม Element เข้าไปใน Array
+                }
             }
         }
     }
+
+    // 2. ใช้ requestAnimationFrame เพื่อเพิ่มคลาส .visible ในเฟรมถัดไป
+    // ทำให้เบราว์เซอร์มีเวลา 1 เฟรมในการประมวลผลการเปลี่ยนแปลงข้อมูลก่อนเริ่ม Animation
+    requestAnimationFrame(() => {
+        elementsToShow.forEach(el => {
+            el.classList.add('visible');
+        });
+    });
 }
 
 teamDataRef.on("value", snapshot => {
