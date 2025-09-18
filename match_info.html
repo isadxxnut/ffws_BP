@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Match Info Control</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #2c2f33; color: #fff; margin: 0; padding: 20px; }
+        h1, h2 { text-align: center; color: #7289da; }
+        .container { display: flex; justify-content: space-around; gap: 20px; flex-wrap: wrap; }
+        .team-panel { background-color: #23272a; border-radius: 8px; padding: 20px; width: 45%; min-width: 400px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        .team-header { font-size: 1.5em; margin-bottom: 15px; border-bottom: 2px solid #7289da; padding-bottom: 10px; }
+        .control-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select { width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #4f545c; background-color: #40444b; color: #fff; box-sizing: border-box; }
+        .player-list { margin-top: 20px; }
+        .player-item { display: flex; align-items: center; justify-content: space-between; background-color: #40444b; padding: 10px; border-radius: 5px; margin-bottom: 10px; }
+        .player-name { font-weight: bold; flex-basis: 50%; }
+        .player-role-select { flex-basis: 45%; }
+        .visibility-controls { background-color: #23272a; border-radius: 8px; padding: 20px; margin: 20px auto; max-width: 500px; text-align: center; }
+        .toggle-switch { display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .toggle-switch label { position: relative; display: inline-block; width: 60px; height: 34px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #7289da; }
+        input:checked + .slider:before { transform: translateX(26px); }
+    </style>
+</head>
+<body>
+
+    <h1>Match Info Control Panel</h1>
+
+    <div class="visibility-controls">
+        <h2>Overlay Visibility</h2>
+        <div style="display: flex; justify-content: space-around;">
+            <div class="toggle-switch">
+                <span>Show Main Info</span>
+                <label>
+                    <input type="checkbox" id="showInfoToggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="toggle-switch">
+                <span>Show Player Roles</span>
+                <label>
+                    <input type="checkbox" id="showRolesToggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Team A Panel -->
+        <div class="team-panel" id="teamAInfo">
+            <div class="team-header" id="teamANameDisplay">Team A</div>
+            <div class="control-group">
+                <label for="teamAScore">Score</label>
+                <input type="number" id="teamAScore" value="0" min="0">
+            </div>
+            <div class="control-group">
+                <label for="teamAFlag">Flag</label>
+                <select id="teamAFlag"></select>
+            </div>
+            <div class="control-group">
+                <label for="teamALogo">Logo</label>
+                <select id="teamALogo"></select>
+            </div>
+            <div class="player-list" id="teamAPlayers">
+                <h2>Players</h2>
+            </div>
+        </div>
+
+        <!-- Team B Panel -->
+        <div class="team-panel" id="teamBInfo">
+            <div class="team-header" id="teamBNameDisplay">Team B</div>
+            <div class="control-group">
+                <label for="teamBScore">Score</label>
+                <input type="number" id="teamBScore" value="0" min="0">
+            </div>
+            <div class="control-group">
+                <label for="teamBFlag">Flag</label>
+                <select id="teamBFlag"></select>
+            </div>
+            <div class="control-group">
+                <label for="teamBLogo">Logo</label>
+                <select id="teamBLogo"></select>
+            </div>
+            <div class="player-list" id="teamBPlayers">
+                <h2>Players</h2>
+            </div>
+        </div>
+    </div>
+
+<script>
+// Firebase configuration
+if (!firebase.apps.length) {
+const firebaseConfig = {
+  apiKey: "AIzaSyB9EkrAmtLoF_i7fPDezhc2DjJJzxjPOZs",
+  authDomain: "ffws-sea-fall-ban-pick.firebaseapp.com",
+  databaseURL: "https://ffws-sea-fall-ban-pick-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "ffws-sea-fall-ban-pick",
+  storageBucket: "ffws-sea-fall-ban-pick.firebasestorage.app",
+  messagingSenderId: "218652907770",
+  appId: "1:218652907770:web:43fc0b73871e9335749143",
+  measurementId: "G-F3CN9C599H"
+};
+    firebase.initializeApp(firebaseConfig);
+}
+const db = firebase.database();
+
+// Firebase references
+const roomRef = db.ref("drafts/room1");
+const teamDataRef = roomRef.child("teamData");
+const matchInfoRef = roomRef.child("matchInfo");
+
+// Data URLs
+const teamLogos = {
+    "NONE": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/NONE.png", "BRU": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/BRU.png", "RRQ": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/RRQ.png", "HEV": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/HEV.png", "EVOS": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/EVOS.png", "TWIS": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/TWIS.png", "FLCN": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/FLCN.png", "BTR": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/BTR.png", "MEC": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/MEC.png", "AGAL": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/AGAL.png", "TDK": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/TDK.png", "FL": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/FL.png", "ONIC": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/ONIC-black.png", "VP": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/VP.png", "WAG": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/WAG.png", "PE": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/PE.png", "EXP": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/EXP.png", "KAGE": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/KAGE.png", "GOW": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/GOW.png"
+};
+const flags = {
+    "NONE": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/NONE.png", "MY": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/FLAG/MY.png", "ID": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/FLAG/ID.png", "TH": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/FLAG/TH.png", "VN": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/FLAG/VN.png"
+};
+const roles = {
+    "NONE": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/logo500x500/NONE.png", "SUPPORT": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/ROLE/SUPPORT.png", "RUSHER": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/ROLE/RUSHER.png", "SNIPER": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/ROLE/SNIPER.png", "RIFLER": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/ROLE/RIFLER.png", "BOMBER": "https://dl.dir.freefiremobile.com/common/Local/TH/CommuTournament/FFWSSEAFALL/ROLE/BOMBER.png"
+};
+
+function populateDropdown(selectElement, optionsObject) {
+    selectElement.innerHTML = '';
+    for (const key in optionsObject) {
+        const option = document.createElement('option');
+        option.value = optionsObject[key];
+        option.textContent = key;
+        selectElement.appendChild(option);
+    }
+}
+
+function updateMatchInfo() {
+    const rolesData = {};
+    // This now reads from our new data-role-key attribute
+    document.querySelectorAll('.player-role-select select').forEach(select => {
+        rolesData[select.dataset.roleKey] = select.value;
+    });
+
+    const data = {
+        teamAName: document.getElementById('teamANameDisplay').textContent,
+        teamBName: document.getElementById('teamBNameDisplay').textContent,
+        teamAScore: document.getElementById('teamAScore').value,
+        teamBScore: document.getElementById('teamBScore').value,
+        teamAFlagUrl: document.getElementById('teamAFlag').value,
+        teamBFlagUrl: document.getElementById('teamBFlag').value,
+        teamALogoUrl: document.getElementById('teamALogo').value,
+        teamBLogoUrl: document.getElementById('teamBLogo').value,
+        showInfo: document.getElementById('showInfoToggle').checked,
+        showRoles: document.getElementById('showRolesToggle').checked,
+        roles: rolesData // Save the new roles structure
+    };
+    matchInfoRef.set(data);
+}
+
+// Populate dropdowns on load
+populateDropdown(document.getElementById('teamAFlag'), flags);
+populateDropdown(document.getElementById('teamBFlag'), flags);
+populateDropdown(document.getElementById('teamALogo'), teamLogos);
+populateDropdown(document.getElementById('teamBLogo'), teamLogos);
+
+// Sync team data from admin panel for display
+teamDataRef.on('value', snapshot => {
+    const data = snapshot.val() || {};
+    document.getElementById('teamANameDisplay').textContent = data.teamAName || 'Team A';
+    document.getElementById('teamBNameDisplay').textContent = data.teamBName || 'Team B';
+    updateMatchInfo(); // Update team names in matchInfo as well
+});
+
+// NEW: Sync player list directly from teamData to allow pre-assignment of roles
+teamDataRef.on('value', snapshot => {
+    const teamData = snapshot.val() || {};
+    const teamAPlayersDiv = document.getElementById('teamAPlayers');
+    const teamBPlayersDiv = document.getElementById('teamBPlayers');
+
+    // Clear existing player lists
+    teamAPlayersDiv.innerHTML = '<h2>Players</h2>';
+    teamBPlayersDiv.innerHTML = '<h2>Players</h2>';
+
+    // Function to create a player item with a role dropdown
+    const createPlayerItem = (playerName, teamPrefix, playerIndex) => {
+        if (!playerName) return null; // Skip if player name is empty
+
+        const playerItem = document.createElement('div');
+        playerItem.className = 'player-item';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'player-name';
+        nameSpan.textContent = playerName;
+
+        const roleSelectContainer = document.createElement('div');
+        roleSelectContainer.className = 'player-role-select';
+
+        const roleSelect = document.createElement('select');
+        // IMPORTANT: We now use a key based on team and player index, e.g., "A_0", "B_1"
+        roleSelect.dataset.roleKey = `${teamPrefix}_${playerIndex}`;
+        populateDropdown(roleSelect, roles);
+        roleSelect.onchange = updateMatchInfo;
+
+        roleSelectContainer.appendChild(roleSelect);
+        playerItem.appendChild(nameSpan);
+        playerItem.appendChild(roleSelectContainer);
+
+        return playerItem;
+    };
+
+    // Populate Team A players
+    (teamData.playersA || []).forEach((name, index) => {
+        const item = createPlayerItem(name, 'A', index);
+        if (item) teamAPlayersDiv.appendChild(item);
+    });
+
+    // Populate Team B players
+    (teamData.playersB || []).forEach((name, index) => {
+        const item = createPlayerItem(name, 'B', index);
+        if (item) teamBPlayersDiv.appendChild(item);
+    });
+
+    // After creating dropdowns, sync their values with existing data in Firebase
+    matchInfoRef.once('value', syncSnapshot => {
+        const info = syncSnapshot.val() || {};
+        if (info.roles) {
+            for (const roleKey in info.roles) {
+                const select = document.querySelector(`select[data-role-key="${roleKey}"]`);
+                if (select) {
+                    select.value = info.roles[roleKey];
+                }
+            }
+        }
+    });
+});
+
+
+// Sync controls with Firebase data
+matchInfoRef.on('value', snapshot => {
+    const data = snapshot.val() || {};
+    document.getElementById('teamAScore').value = data.teamAScore || 0;
+    document.getElementById('teamBScore').value = data.teamBScore || 0;
+    document.getElementById('teamAFlag').value = data.teamAFlagUrl || "";
+    document.getElementById('teamBFlag').value = data.teamBFlagUrl || "";
+    document.getElementById('teamALogo').value = data.teamALogoUrl || "";
+    document.getElementById('teamBLogo').value = data.teamBLogoUrl || "";
+    document.getElementById('showInfoToggle').checked = data.showInfo || false;
+    document.getElementById('showRolesToggle').checked = data.showRoles || false;
+
+    if (data.roles) {
+        for (const roleKey in data.roles) {
+            const select = document.querySelector(`select[data-role-key="${roleKey}"]`);
+            if (select) {
+                select.value = data.roles[roleKey];
+            }
+        }
+    }
+});
+
+
+// Add event listeners to all controls to update Firebase
+document.querySelectorAll('input, select').forEach(element => {
+    element.addEventListener('change', updateMatchInfo);
+    if(element.type === 'number') {
+        element.addEventListener('input', updateMatchInfo);
+    }
+});
+
+</script>
+</body>
+</html>
+
